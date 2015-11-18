@@ -5,7 +5,8 @@ default["nginx_passenger"]["nginx"]["conf"] = {
   "worker_processes"  => "2",
   "relative_pid_file" => "logs/nginx.pid",
   "pid_file"          => "/opt/nginx/logs/nginx.pid",
-  "error_log"         => "logs/error.log"
+  "error_log"         => "logs/error.log",
+  "max_upload"        => node["application"]["max_upload"] || "5M"
 }
 
 # nginx modules

@@ -126,7 +126,7 @@ bash 'Compiles nginx with all required modules' do
   end
 
   code <<-END
-    /usr/local/bin/passenger-install-nginx-module --auto --prefix=/opt/nginx --languages=ruby --nginx-source-dir=/tmp/nginx-#{node["nginx_passenger"]["nginx"]["version"]} --extra-configure-flags=\"#{extra.join(' ')}\"
+    /usr/local/bin/passenger-install-nginx-module --auto --prefix=/opt/nginx --languages=ruby --nginx-source-dir=#{Chef::Config[:file_cache_path]}/nginx-#{node["nginx_passenger"]["nginx"]["version"]} --extra-configure-flags=\"#{extra.join(' ')}\"
   END
 end
 
