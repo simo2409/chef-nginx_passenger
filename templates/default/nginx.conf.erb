@@ -1,0 +1,119 @@
+#user  nobody;
+worker_processes  <%= node["nginx_passenger"]["nginx"]["conf"]["worker_processes"] %>;
+error_log         <%= node["nginx_passenger"]["nginx"]["conf"]["error_log"] %>  info;
+pid               <%= ["nginx_passenger"]["nginx"]["conf"]["relative_pid_file"] %>;
+
+events {
+  worker_connections  1024;
+}
+
+http {
+    passenger_root /usr/local/lib/ruby/gems/2.1.0/gems/passenger-<%= node["nginx_passenger"]["passenger"]["version"] %>;
+    passenger_ruby /usr/local/bin/ruby;
+
+    # Max passenger processes
+    passenger_max_pool_size <%= node["nginx_passenger"]["passenger"]["conf"]["passenger_max_pool_size"] %>;
+    # Min passenger processes
+    passenger_min_instances <%= node["nginx_passenger"]["passenger"]["conf"]["passenger_min_instances"] %>;
+    # URL to fetch for pre_start
+    passenger_pre_start <%= node["nginx_passenger"]["application"]["url_for_pre_start"] %>;
+    # Friendly error pages
+    passenger_friendly_error_pages off;
+    # Max_requests (then restart)
+    passenger_max_requests 1000;
+
+    passenger_show_version_in_header off;
+
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    client_body_buffer_size 10K;
+    client_header_buffer_size 4K;
+    large_client_header_buffers 2 4K;
+
+    client_max_body_size 5M;
+
+    keepalive_timeout  15;
+
+    server_tokens off;
+
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    #access_log  logs/access.log  main;
+    access_log off;
+
+    sendfile        on;
+    tcp_nopush     on;
+
+    server {
+      listen       80;
+      # more_clear_headers  'Server' 'X-Powered-By' 'X-Runtime';
+      server_name  www.<%= node["nginx_passenger"]["application"]["domain"] %>;
+      return       301 <%= node["nginx_passenger"]["application"]["domain"] %>$request_uri;
+    }
+
+    server {
+      listen 80;
+      server_name <%= node["nginx_passenger"]["application"]["domain"] %> <%= node["automatic"]["ipaddress"] %>;
+      root <%= node["nginx_passenger"]["application"]["deploy_dir"] %><%= node["nginx_passenger"]["application"]["name"] %>/current/public;
+
+      more_clear_headers  'Server' 'X-Powered-By' 'X-Runtime';
+
+      rails_env production;
+
+      # Pagespeed
+      <%- if node["nginx_passenger"]["ngx_pagespeed"]["enabled"] -%>
+      pagespeed on;
+      <%- else -%>
+      pagespeed off;
+      <%- end -%>
+      pagespeed FileCachePath /var/ngx_pagespeed_cache;
+      pagespeed ModPagespeedEnableFilters collapse_whitespace,local_storage_cache,remove_comments,sprite_images,local_storage_cache,lazyload_images;
+      location ~ "\.pagespeed\.([a-z]\.)?[a-z]{2}\.[^.]{10}\.[^.]+" { add_header "" ""; }
+      location ~ "^/ngx_pagespeed_static/" { }
+      location ~ "^/ngx_pagespeed_beacon$" { }
+      location /ngx_pagespeed_statistics { allow 127.0.0.1; deny all; }
+      location /ngx_pagespeed_message { allow 127.0.0.1; deny all; }
+
+      resolver 8.8.4.4;
+
+      # Default gzip
+      gzip on;
+      gzip_comp_level 8;
+      gzip_min_length 1400;
+      gzip_types text/plain text/css application/json application/x-javascript application/xml+rss text/javascript;
+
+      passenger_enabled on;
+
+      location ~ ^/(assets)/  {
+        root <%= node["nginx_passenger"]["application"]["deploy_dir"] %><%= node["nginx_passenger"]["application"]["name"] %>/current/public;
+        gzip_static on; # to serve pre-gzipped version
+        expires max;
+        gzip_vary on;
+        add_header Cache-Control public;
+        gzip_types text/plain text/css application/json application/x-javascript application/xml+rss text/javascript;
+        access_log off;
+      }
+
+      location ~ ^/(images)/  {
+        root <%= node["nginx_passenger"]["application"]["deploy_dir"] %><%= node["nginx_passenger"]["application"]["name"] %>/current/public;
+        gzip_static on; # to serve pre-gzipped version
+        expires max;
+        add_header Cache-Control public;
+        access_log off;
+      }
+    }
+    server {
+        listen 127.0.0.1;
+        server_name localhost;
+        passenger_enabled off;
+        location /nginx_status {
+                stub_status on;
+                access_log   off;
+                allow 127.0.0.1;
+                deny all;
+        }
+    }
+}
